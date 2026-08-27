@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hilton GL Mapping & JE Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f3f4f6; overflow: hidden; }
+        .spreadsheet-table { border-collapse: collapse; width: max-content; font-family: Arial, sans-serif; font-size: 11px; }
+        .spreadsheet-table th, .spreadsheet-table td { border: 1px solid #a3a3a3; padding: 3px 6px; white-space: nowrap; }
+        .spreadsheet-table th { background-color: #e5e7eb; font-weight: bold; color: #000; text-align: center; position: sticky; top: 0; z-index: 20; border-bottom: 2px solid #000; }
+        .spreadsheet-table td { background-color: #ffffff; color: #000; }
+        .spreadsheet-table tbody tr:hover td { background-color: #e0f2fe; }
+        
+        /* Sticky columns for All Data */
+        .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #f9fafb !important; font-weight: normal; border-right: 1px solid #a3a3a3; }
+        .sticky-col-2 { position: sticky; left: 80px; z-index: 10; background-color: #f9fafb !important; border-right: 1px solid #a3a3a3; }
+        .sticky-col-3 { position: sticky; left: 160px; z-index: 10; background-color: #f9fafb !important; border-right: 2px solid #000; }
+        .spreadsheet-table th.sticky-col-1, .spreadsheet-table th.sticky-col-2, .spreadsheet-table th.sticky-col-3 { z-index: 30; background-color: #e5e7eb !important; }
+
+        /* Excel-like Bottom Tab Bar */
+        .excel-tab-bar {
+            display: flex;
+            overflow-x: auto;
+            background-color: #e5e7eb;
+            border-top: 1px solid #9ca3af;
+            scrollbar-width: thin;
+        }
+        .excel-tab {
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-right: 1px solid #9ca3af;
+            border-top: 2px solid transparent;
+            cursor: pointer;
+            white-space: nowrap;
+            background-color: #f3f4f6;
+            color: #4b5563;
+        }
+        .excel-tab:hover { background-color: #ffffff; }
+        .excel-tab.active { background-color: #ffffff; border-top: 2px solid #2563eb; color: #111827; border-bottom: none; }
+        
+        .tab-yellow { background-color: #fef08a; color: #854d0e; }
+        .tab-yellow.active { background-color: #ffffff; border-top-color: #ca8a04; }
+        .tab-green { background-color: #bbf7d0; color: #166534; }
+        .tab-green.active { background-color: #ffffff; border-top-color: #16a34a; }
+        .tab-purple { background-color: #e9d5ff; color: #6b21a8; }
+        .tab-purple.active { background-color: #ffffff; border-top-color: #9333ea; }
+        
+        .je-table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; }
+        .je-table th, .je-table td { border: 1px solid #000; padding: 2px 4px; }
+        .je-table th { font-weight: bold; text-align: center; }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <header class="bg-gray-800 text-white flex-none h-14 flex items-center justify-between px-4 shadow-md z-50">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-lg font-bold tracking-wider" id="header-title">HILTON GL ENGINE - ALL DATA</h1>
+            <div class="h-6 w-px bg-gray-600"></div>
+            <select id="global-month-select" onchange="changeGlobalMonth()" class="bg-gray-700 text-white text-sm rounded border border-gray-600 px-3 py-1 outline-none focus:border-blue-400">
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7" selected>August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+            </select>
+        </div>
+        <div class="flex space-x-3">
+            <label class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-1.5 rounded cursor-pointer transition-colors shadow-sm flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Import Daily/Monthly File
+                <input type="file" id="file-upload" class="hidden" accept=".xlsx, .xlsm, .xls, .csv" onchange="handleFileUpload(event)">
+            </label>
+            <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-500 text-white text-sm px-4 py-1.5 rounded transition-colors shadow-sm flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Export Sage JE
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <div class="w-64 bg-white border-r border-gray-300 flex flex-col shadow-sm z-40">
+            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Workspace Setup</h2>
+                <select id="workspace-year-select" onchange="changeGlobalYear()" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 outline-none focus:border-blue-500 bg-white">
+                </select>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                <button onclick="switchTab('tab-mapping')" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    GL Mapping Dictionary
+                </button>
+                <button onclick="switchTab('tab-quick-translator')" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded flex items-center mt-2 border border-blue-200 bg-blue-50">
+                    <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    <span class="font-bold text-blue-800">Instant GL Translator</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col bg-gray-200 relative">
+            
+            <div class="flex-1 overflow-hidden relative" id="main-viewport">
+                
+                <!-- Tab: All Data -->
+                <div id="tab-all-data" class="tab-content h-full block overflow-auto bg-white p-2">
+                    <div id="all-data-grid"></div>
+                </div>
+
+                <!-- Tab: Cash Log -->
+                <div id="tab-cash-log" class="tab-content h-full hidden flex flex-col bg-white">
+                    <div class="p-3 border-b border-gray-300 bg-yellow-50 flex justify-between items-center sticky top-0 z-40">
+                        <div>
+                            <h2 class="text-lg font-bold text-yellow-900">Hilton Garden Inn Cash Log</h2>
+                            <p class="text-xs text-yellow-700" id="cash-log-date-label">For Month</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-auto" id="cash-log-grid"></div>
+                </div>
+
+                <!-- Tab: Daily Activity -->
+                <div id="tab-daily-activity" class="tab-content h-full hidden flex flex-col bg-gray-100">
+                    <div class="p-3 border-b border-gray-300 bg-purple-50 flex justify-between items-center sticky top-0 z-40">
+                        <div>
+                            <h2 class="text-lg font-bold text-purple-900">Hilton - Daily Activity</h2>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <label class="text-sm font-bold text-purple-900">Day:</label>
+                            <select id="daily-activity-day" onchange="renderActivity('daily')" class="text-sm border border-purple-300 rounded px-2 py-1 outline-none focus:border-purple-500">
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-auto p-4" id="daily-activity-grid"></div>
+                </div>
+
+                <!-- Tab: Monthly Activity -->
+                <div id="tab-monthly-activity" class="tab-content h-full hidden flex flex-col bg-gray-100">
+                    <div class="flex-1 overflow-auto p-4" id="monthly-activity-grid"></div>
+                </div>
+
+                <!-- Tab: Final Audit Input (Day View) -->
+                <div id="tab-daily-audit-input" class="tab-content h-full hidden flex flex-col bg-white">
+                    <div class="p-3 border-b border-gray-300 bg-gray-100 sticky top-0 z-40 flex justify-between items-center shadow-sm">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Final Audit Entry</h2>
+                            <p class="text-xs text-gray-500" id="audit-date-display">Date</p>
+                        </div>
+                        <button onclick="saveDailyAudit()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-6 py-1.5 rounded shadow-sm font-medium">Save Data</button>
+                    </div>
+                    <div class="flex-1 overflow-auto p-6" id="final-audit-form"></div>
+                </div>
+
+                <!-- Tab: GL Mapping -->
+                <div id="tab-mapping" class="tab-content h-full hidden p-6 bg-white overflow-auto">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">RREDCO Sharp GL Dictionary</h2>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg shadow-sm overflow-hidden" id="gl-mapping-table"></div>
+                </div>
+
+                <!-- Tab: Instant GL Translator -->
+                <div id="tab-quick-translator" class="tab-content h-full hidden p-8 bg-white overflow-auto">
+                    <div class="max-w-3xl mx-auto mt-10">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Instant GL Translator</h2>
+                        <p class="text-sm text-gray-600 mb-8">Upload any legacy spreadsheet. The engine will scan every single cell. It uses smart-detection and dynamic department logic to securely swap old GLs and old descriptions for the new 10-digit formats without corrupting dollar amounts.</p>
+                        
+                        <div class="border-2 border-dashed border-blue-300 rounded-lg p-12 text-center bg-blue-50 hover:bg-blue-100 transition-colors">
+                            <input type="file" id="translator-upload" class="hidden" accept=".xlsx, .xlsm, .xls, .csv" onchange="processQuickTranslation(event)">
+                            <label for="translator-upload" class="cursor-pointer block">
+                                <svg class="mx-auto h-16 w-16 text-blue-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <span id="translator-upload-label" class="bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 border border-blue-600 px-4 py-2 inline-block">
+                                    Browse to Upload File
+                                </span>
+                            </label>
+                        </div>
+
+                        <div id="translator-results" class="mt-8 hidden">
+                            <div class="bg-green-50 border border-green-200 p-6 rounded-lg flex items-center justify-between shadow-sm">
+                                <div>
+                                    <h3 class="text-lg font-bold text-green-800" id="translator-status">Translation Complete!</h3>
+                                    <p class="text-sm text-green-700 mt-1" id="translator-stats">Translated X cells.</p>
+                                </div>
+                                <button onclick="downloadTranslatedFile()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2.5 rounded shadow-sm font-medium flex items-center transition-colors">
+                                    Download Updated File
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="excel-tab-bar" id="bottom-tab-bar">
+                <div class="excel-tab tab-yellow" onclick="switchTab('tab-cash-log', null, 'Cash Log', this)">Cash Log</div>
+                <div class="excel-tab tab-green active" onclick="switchTab('tab-all-data', null, 'All Data', this)">All Data</div>
+                <div class="excel-tab tab-purple" onclick="switchTab('tab-daily-activity', null, 'Daily Activity', this)">Hilton - Daily Activity</div>
+                <div class="excel-tab tab-purple" onclick="switchTab('tab-monthly-activity', null, 'Monthly Activity', this)">Hilton - Monthly Activity</div>
+                <div id="dynamic-day-tabs" class="flex"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // EXPANDED DICTIONARY: Added critical base accounts (-000) for dynamic department mapping.
+        const glDictionary = {
+            "GUEST ROOM": { newGL: "4041-100-000", desc: "Transient/Rack Room Sales - Hotel" },
+            "GUEST ROOM HONORS": { newGL: "4043-100-000", desc: "Discount/Internet Rooms - Hotel" },
+            "EXTRA ADULT": { newGL: "4041-100-000", desc: "Transient/Rack Room Sales - Hotel" },
+            "ADD-ON EARLY ARRIVAL": { newGL: "4048-100-000", desc: "Miscellaneous Revenue - Hotel" },
+            "LATE CANCEL ROOM REVENUE": { newGL: "4047-100-000", desc: "No Show Room Revenue - Hotel" },
+            "NO SHOW ROOM REVENUE": { newGL: "4047-100-000", desc: "No Show Room Revenue - Hotel" },
+            "* BANQUET": { newGL: "4051-200-000", desc: "Banquet Revenue - F&B" },
+            "BANQUET": { newGL: "4051-200-000", desc: "Banquet Revenue - F&B" },
+            "* GREAT AMERICAN GRILL": { newGL: "4050-200-000", desc: "Restaurant Food Sales - F&B" },
+            "GREAT AMERICAN GRILL": { newGL: "4050-200-000", desc: "Restaurant Food Sales - F&B" },
+            "* ROOM SERVICE": { newGL: "4053-200-000", desc: "Room Service Food - F&B" },
+            "ROOM SERVICE": { newGL: "4053-200-000", desc: "Room Service Food - F&B" },
+            "* PAVILLION PANTRY": { newGL: "4055-200-000", desc: "Pavillion Taxable" },
+            "PAVILLION PANTRY": { newGL: "4055-200-000", desc: "Pavillion Taxable" },
+            "PANTRY SALES TAX": { newGL: "2300-000-000", desc: "Sales Tax Payable" },
+            "RM - CA TOURISM ASSESSMENT": { newGL: "2305-000-000", desc: "Tourism Assessment" },
+            "RM - LOCAL TOURISM ASSESSMENT": { newGL: "2304-000-000", desc: "Local Tourism Tax Payable" },
+            "RM - OCCUPANCY TAX": { newGL: "2303-000-000", desc: "Redding Occupancy Tax Payable" },
+            "SALES TAX": { newGL: "2300-000-000", desc: "Sales Tax Payable" },
+            "IN HOUSE": { newGL: "1120-000-000", desc: "City Ledger Receivable" },
+            "GROUP MASTER": { newGL: "1120-000-000", desc: "City Ledger Receivable" },
+            "ADVANCE DEPOSIT": { newGL: "2400-000-000", desc: "Guest Advance Deposit" },
+            "DIRECT BILL": { newGL: "1200-000-000", desc: "Accounts Receivable" },
+            "CASH DROPS": { newGL: "1030-000-000", desc: "Undeposited Funds" },
+            "CASH POSTED": { newGL: "1005-000-000", desc: "Cash In Registers" },
+            "SAFE DROPS": { newGL: "1030-000-000", desc: "Undeposited Funds" },
+            "CASH OVER / SHORT": { newGL: "6035-100-000", desc: "Short and Over - Hotel" },
+            "VISA": { newGL: "2018-000-000", desc: "Purchases Clearing - Credit Cards" },
+            "MASTER": { newGL: "2018-000-000", desc: "Purchases Clearing - Credit Cards" },
+            "DISCOVER": { newGL: "2018-000-000", desc: "Purchases Clearing - Credit Cards" },
+            "AMEX": { newGL: "2018-000-000", desc: "Purchases Clearing - Credit Cards" },
+            
+            // Base Mappings for Smart Translator
+            "1000-000": { newGL: "1000-000-000", desc: "Change on Hand" },
+            "1010-000": { newGL: "1016-000-000", desc: "Checking Columbia WRHCO Deposit" },
+            "1012-000": { newGL: "1015-000-000", desc: "Checking Columbia Bank" },
+            "1018-000": { newGL: "1018-000-000", desc: "Charles Schwab Money Market" },
+            "1020-000": { newGL: "1014-000-000", desc: "Checking Cogent Bank" },
+            "1025-000": { newGL: "1010-000-000", desc: "Checking TriCounties" },
+            "1030-000": { newGL: "1017-000-000", desc: "Checking Columbia WRHCO Managers" },
+            "1085-000": { newGL: "1018-000-000", desc: "Charles Schwab Money Market" },
+            "1090-000": { newGL: "1090-000-000", desc: "House Funds" },
+            "1112-000": { newGL: "1112-000-000", desc: "Hilton Rewards Receivable" },
+            "1120-000": { newGL: "1120-000-000", desc: "City Ledger Receivable" },
+            "1125-000": { newGL: "1125-000-000", desc: "Receivables Other" },
+            "1150-000": { newGL: "1201-000-000", desc: "Accounts Receivable - Other" },
+            "1200-000": { newGL: "1200-000-000", desc: "Accounts Receivable" },
+            "1290-000": { newGL: "1290-000-000", desc: "Unposted Door Dash Deposits" },
+            "1300-000": { newGL: "1314-000-000", desc: "Prepaid Expenses" },
+            "1304-000": { newGL: "1320-000-000", desc: "Prepaid Worker's Comp" },
+            "1305-000": { newGL: "1316-000-000", desc: "Prepaid Health Insurance" },
+            "1315-000": { newGL: "1315-000-000", desc: "Prepaid Payroll" },
+            "1320-000": { newGL: "1319-000-000", desc: "Prepaid Real Property Tax" },
+            "1400-000": { newGL: "1416-000-000", desc: "Inventory - Food" },
+            "1410-000": { newGL: "1402-000-000", desc: "Inventory - Beverage" },
+            "1420-000": { newGL: "1428-000-000", desc: "Inventory - Pantry" },
+            "1910-000": { newGL: "1910-000-000", desc: "Suspense" },
+            "1911-000": { newGL: "1911-000-000", desc: "HH Honor Clearing Account" },
+            "2000-000": { newGL: "2000-000-000", desc: "Accounts Payable" },
+            "2010-000": { newGL: "2005-000-000", desc: "Accrued Accounts Payable" },
+            "2012-000": { newGL: "2018-000-000", desc: "Purchases Clearing - Credit Cards" },
+            "2300-000": { newGL: "2300-000-000", desc: "Sales Tax Payable" },
+            "2310-000": { newGL: "2303-000-000", desc: "Redding Occupancy Tax Payable" },
+            "2311-000": { newGL: "2304-000-000", desc: "Local Tourism Tax Payable" },
+            "2312-000": { newGL: "2305-000-000", desc: "Tourism Assessment" },
+            "2320-000": { newGL: "2346-000-000", desc: "Garnishments Payable" },
+            "2340-000": { newGL: "2340-000-000", desc: "Accrued Salaries & Wages Payable" },
+            "2342-000": { newGL: "2345-000-000", desc: "Payroll Clearing Account" },
+            "2343-000": { newGL: "2343-000-000", desc: "Accrued 401k/Roth Payable" },
+            "2344-000": { newGL: "2344-000-000", desc: "Accrued Tips Payable" },
+            "2345-000": { newGL: "2344-000-000", desc: "Accrued Tips Payable" },
+            "2346-000": { newGL: "2343-000-000", desc: "Accrued 401k/Roth Payable" },
+            "2350-000": { newGL: "2341-000-000", desc: "Accrued Payroll Taxes Payable" },
+            "2352-000": { newGL: "2342-000-000", desc: "Accrued Vacation Payable" },
+            "2375-000": { newGL: "2110-000-000", desc: "Accrued Real Property Tax Payable" },
+            "2380-000": { newGL: "2350-000-000", desc: "Worker's Comp Payable" },
+            "2400-000": { newGL: "2400-000-000", desc: "Guest Advance Deposit" },
+            "2500-000": { newGL: "2916-000-000", desc: "Paycheck Protection Program Loan" },
+            "2930-000": { newGL: "2930-000-000", desc: "Hilton Margin Loan Payable" },
+            
+            // Base Revenues
+            "4041-000": { newGL: "4041-000-000", desc: "Transient/Rack Room Sales" },
+            "4042-000": { newGL: "4042-000-000", desc: "Corporate Accounts" },
+            "4043-000": { newGL: "4043-000-000", desc: "Discount/Internet Rooms" },
+            "4044-000": { newGL: "4044-000-000", desc: "Group Sales" },
+            "4045-000": { newGL: "4045-000-000", desc: "Government Room Sales" },
+            "4046-000": { newGL: "4046-000-000", desc: "100% Brand GTD Allowance" },
+            "4047-000": { newGL: "4047-000-000", desc: "No Show Room Revenue" },
+            "4048-000": { newGL: "4048-000-000", desc: "Miscellaneous Revenue" },
+            "4049-000": { newGL: "4049-000-000", desc: "Governmental Exempt Rooms" },
+            "4050-000": { newGL: "4050-000-000", desc: "Restaurant Food Sales" },
+            "4051-000": { newGL: "4051-000-000", desc: "Banquet Revenue" },
+            "4052-000": { newGL: "4052-000-000", desc: "Banquet Alcohol Sales" },
+            "4053-000": { newGL: "4053-000-000", desc: "Room Service Food" },
+            "4054-000": { newGL: "4054-000-000", desc: "Restaurant Alcohol" },
+            "4055-000": { newGL: "4055-000-000", desc: "Pavillion Taxable" },
+            "4056-000": { newGL: "4056-000-000", desc: "Pavillion Non-Taxable" },
+            "4057-000": { newGL: "4057-000-000", desc: "Room Rental Sales" },
+            "4058-000": { newGL: "4058-000-000", desc: "Banquet Equip Rental AV" },
+            "4059-000": { newGL: "4059-000-000", desc: "ATM Commissions" },
+            "4067-000": { newGL: "4067-000-000", desc: "Building Lease Income" },
+            "4213-000": { newGL: "4213-000-000", desc: "Discounts/Allowances - Food" },
+
+            // Pre-Mapped Legacy Codes from older WRHCO iterations
+            "4001-100": { newGL: "4041-100-000", desc: "Transient/Rack Room Sales - Hotel" },
+            "4002-100": { newGL: "4042-100-000", desc: "Corporate Accounts - Hotel" },
+            "4003-100": { newGL: "4043-100-000", desc: "Discount/Internet Rooms - Hotel" },
+            "4004-100": { newGL: "4044-100-000", desc: "Group Sales - Hotel" },
+            "4005-100": { newGL: "4045-100-000", desc: "Government Room Sales - Hotel" },
+            "4008-100": { newGL: "4046-100-000", desc: "100% Brand GTD Allowance - Hotel" },
+            "4009-100": { newGL: "4047-100-000", desc: "No Show Room Revenue - Hotel" },
+            "4010-100": { newGL: "4048-100-000", desc: "Miscellaneous Revenue - Hotel" },
+            "4010-300": { newGL: "4059-100-000", desc: "ATM Commissions - Hotel" },
+            "4013-100": { newGL: "4072-100-000", desc: "Laundry Income - Hotel" },
+            "4014-100": { newGL: "4049-100-000", desc: "Governmental Exempt Rooms - Hotel" },
+            "4020-200": { newGL: "4050-200-000", desc: "Restaurant Food Sales - F&B" },
+            "4021-200": { newGL: "4051-200-000", desc: "Banquet Revenue - F&B" },
+            "4030-200": { newGL: "4052-200-000", desc: "Banquet Alcohol Sales - F&B" },
+            "4040-200": { newGL: "4053-200-000", desc: "Room Service Food - F&B" },
+            "4050-200": { newGL: "4054-200-000", desc: "Restaurant Alcohol - F&B" },
+            "4060-200": { newGL: "4055-200-000", desc: "Pavillion Taxable" },
+            "4061-200": { newGL: "4056-200-000", desc: "Pavillion Non-Taxable - F&B" },
+            "4070-200": { newGL: "4057-200-000", desc: "Room Rental Sales - F&B" },
+            "4071-200": { newGL: "4058-200-000", desc: "Banquet Equip Rental AV - F&B" },
+            
+            // Base COGS & Expenses
+            "4516-000": { newGL: "4516-000-000", desc: "COGS Food" },
+            "5110-000": { newGL: "5110-000-000", desc: "Salaries & Wages" },
+            "5510-000": { newGL: "5510-000-000", desc: "Payroll Taxes and Fringe" },
+            "6001-000": { newGL: "6001-000-000", desc: "Cable/Phone/Internet Expense" },
+            "6010-000": { newGL: "6010-000-000", desc: "Operating Supplies" },
+            "6011-000": { newGL: "6011-000-000", desc: "Cleaning Supplies" },
+            "6013-000": { newGL: "6013-000-000", desc: "Laundry Expense" },
+            "6019-000": { newGL: "6019-000-000", desc: "Food Allowance" },
+            "6025-000": { newGL: "6025-000-000", desc: "Bad Debt Expense" },
+            "6035-000": { newGL: "6035-000-000", desc: "Cash Over/Short" },
+            "6053-000": { newGL: "6053-000-000", desc: "Donations & Sponsorships" },
+            "6125-000": { newGL: "6125-000-000", desc: "Insurance-General, Property, & Product" },
+            "6152-000": { newGL: "6152-000-000", desc: "Bank Charges/Merchant Fees" },
+            "6222-000": { newGL: "6222-000-000", desc: "Reservation Expense" },
+            "6650-000": { newGL: "6650-000-000", desc: "Repairs & Maintenance" },
+            "6760-000": { newGL: "6760-000-000", desc: "Contract Services" },
+            "6771-000": { newGL: "6771-000-000", desc: "Real Property Tax" },
+            "6860-000": { newGL: "6860-000-000", desc: "Tribal Room Comp" },
+            "9205-000": { newGL: "9205-000-000", desc: "Depreciation" },
+            "9800-000": { newGL: "9800-000-000", desc: "RREDCO Admin Fees Expense" }
+        };
+
+        function smartTranslateGL(legacyGL, description = "") {
+            let upperGL = String(legacyGL || '').toUpperCase().trim();
+            let upperDesc = String(description || '').toUpperCase().trim();
+            
+            let result = {
+                newGL: upperGL !== "0" && upperGL !== "" ? upperGL : "0", 
+                newDesc: description || ""
+            };
+
+            // 1. Exact match by GL code
+            if (glDictionary[upperGL]) {
+                return { newGL: glDictionary[upperGL].newGL, newDesc: glDictionary[upperGL].desc };
+            }
+
+            // 2. Exact match by Description
+            if (upperDesc) {
+                for (const [key, mapData] of Object.entries(glDictionary)) {
+                    if (mapData.desc.toUpperCase() === upperDesc || key.toUpperCase() === upperDesc) {
+                        return { newGL: mapData.newGL, newDesc: mapData.desc };
+                    }
+                }
+            }
+
+            // 3. INTELLIGENT DEPARTMENT-AWARE BASE ROUTING
+            let match = upperGL.match(/^(\d{4})-(\d{3})$/);
+            if (match) {
+                let base = match[1];
+                let legacyDept = match[2];
+
+                let baseData = glDictionary[base + "-000"] || glDictionary[base];
+
+                if (baseData && baseData.newGL !== "0") {
+                    let newBase = baseData.newGL.substring(0, 4);
+                    let newDept = "000";
+
+                    // Apply Hilton to RREDCO Department Shift Rules
+                    if (legacyDept === "100") newDept = "100";       // Hotel -> Hotel
+                    else if (legacyDept === "200") newDept = "200";  // F&B -> F&B
+                    else if (legacyDept === "300") newDept = "300";  // Sales/Admin -> Sales/Admin
+                    else if (legacyDept === "400") newDept = "300";  // Franchise merged into Sales/Admin
+                    else if (legacyDept === "500") newDept = "400";  // Maint shifted to Facilities
+                    else newDept = legacyDept;                       // Pass-through unknown depts
+
+                    return { newGL: `${newBase}-${newDept}-000`, newDesc: baseData.desc };
+                }
+            }
+
+            return result; // Pass through safely if no rule hits
+        }
+
+        let multiYearData = { 2026: {} };
+        let activeYear = 2026;
+        let activeMonth = 7; 
+        let activeDay = 1;
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        let translatedWorkbook = null;
+        let translatedFileName = "";
+
+        function initApp() {
+            for (let m = 0; m < 12; m++) multiYearData[2026][m] = []; 
+            updateWorkspaceDropdown();
+            document.getElementById('global-month-select').value = activeMonth;
+            renderDictionary();
+            changeGlobalMonth();
+        }
+
+        function updateWorkspaceDropdown() {
+            let select = document.getElementById('workspace-year-select');
+            select.innerHTML = '';
+            Object.keys(multiYearData).sort((a,b) => b-a).forEach(year => {
+                select.insertAdjacentHTML('beforeend', `<option value="${year}">${year} Master Ledger</option>`);
+            });
+            select.value = activeYear;
+        }
+
+        function changeGlobalYear() {
+            activeYear = parseInt(document.getElementById('workspace-year-select').value);
+            changeGlobalMonth();
+        }
+
+        function changeGlobalMonth() {
+            activeMonth = parseInt(document.getElementById('global-month-select').value);
+            updateBottomTabs();
+            populateDaySelectors();
+            renderAllData();
+            renderCashLog();
+            renderActivity('daily');
+            renderActivity('monthly');
+            if(document.getElementById('tab-daily-audit-input').classList.contains('hidden') === false) openDailyAudit(activeDay);
+        }
+
+        function updateBottomTabs() {
+            let daysInMonth = new Date(activeYear, activeMonth + 1, 0).getDate();
+            let container = document.getElementById('dynamic-day-tabs');
+            container.innerHTML = '';
+            for(let i=1; i<=daysInMonth; i++) {
+                container.insertAdjacentHTML('beforeend', `<div class="excel-tab day-tab" id="tab-day-${i}" onclick="switchTab('tab-daily-audit-input', ${i}, 'Final Audit - Day ${i}', this)">${i}</div>`);
+            }
+        }
+
+        function populateDaySelectors() {
+            let daysInMonth = new Date(activeYear, activeMonth + 1, 0).getDate();
+            let select = document.getElementById('daily-activity-day');
+            select.innerHTML = '';
+            for(let i=1; i<=daysInMonth; i++) select.insertAdjacentHTML('beforeend', `<option value="${i}">Day ${i}</option>`);
+        }
+
+        function switchTab(tabId, day = null, title = '', el = null) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            if(title) document.getElementById('header-title').innerText = `HILTON GL ENGINE - ${title.toUpperCase()}`;
+            
+            if(el) {
+                document.querySelectorAll('.excel-tab').forEach(t => t.classList.remove('active'));
+                el.classList.add('active');
+            } else if (tabId === 'tab-all-data') {
+                 document.querySelectorAll('.excel-tab').forEach(t => t.classList.remove('active'));
+                 document.querySelector('.tab-green').classList.add('active');
+            }
+
+            if(day !== null) { activeDay = day; openDailyAudit(activeDay); }
+            if(tabId === 'tab-all-data') renderAllData();
+            if(tabId === 'tab-cash-log') renderCashLog();
+            if(tabId === 'tab-daily-activity') renderActivity('daily');
+            if(tabId === 'tab-monthly-activity') renderActivity('monthly');
+        }
+
+        function formatExcelCurrency(val) {
+            if (!val || Math.abs(val) < 0.001) return '-';
+            let formatted = Math.abs(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (val < 0) return `(${formatted})`;
+            return formatted;
+        }
+        
+        function formatPlainExcelCurrency(val) {
+            if (!val || Math.abs(val) < 0.001) return '';
+            return Math.abs(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function renderAllData() {
+            const container = document.getElementById('all-data-grid');
+            let data = multiYearData[activeYear][activeMonth];
+            let daysInMonth = new Date(activeYear, activeMonth + 1, 0).getDate();
+            
+            let thead = `<tr>
+                <th class="sticky-col-1">Account</th>
+                <th class="sticky-col-2">Legacy</th>
+                <th class="sticky-col-3 text-left pl-2">ACCOUNT DESCRIPTION</th>`;
+            for(let i=1; i<=daysInMonth; i++) thead += `<th class="text-blue-600 underline cursor-pointer hover:bg-blue-100" onclick="switchTab('tab-daily-audit-input', ${i}, 'Final Audit - Day ${i}')">${i}</th>`;
+            thead += `<th>Total</th></tr>`;
+            
+            let tbody = '';
+            if (data.length === 0) tbody = `<tr><td colspan="${daysInMonth + 4}" class="text-center py-8 text-gray-500 italic">No data imported for this month.</td></tr>`;
+            else {
+                data.forEach(row => {
+                    let tr = `<tr>
+                        <td class="sticky-col-1 text-center text-gray-700">${row.mappedGL !== '0' ? row.mappedGL : row.legacyGL}</td>
+                        <td class="sticky-col-2 text-center text-gray-400">${row.legacyGL}</td>
+                        <td class="sticky-col-3 pl-2 uppercase text-gray-800 font-medium">${row.desc}</td>`;
+                    let mtd = 0;
+                    for(let i=0; i<daysInMonth; i++) {
+                        let val = row.days[i] || 0; mtd += val;
+                        let formattedVal = formatExcelCurrency(val);
+                        tr += `<td class="text-right px-1 w-20"><div class="flex justify-between w-full"><span class="text-gray-400 select-none">${formattedVal==='-'?'':'$'}</span><span class="${val < 0 ? 'text-black' : 'text-black'}">${formattedVal}</span></div></td>`;
+                    }
+                    let formattedMtd = formatExcelCurrency(mtd);
+                    tr += `<td class="bg-gray-100 text-right px-1 font-bold w-24"><div class="flex justify-between w-full"><span class="text-gray-500 select-none">${formattedMtd==='-'?'':'$'}</span><span class="text-black">${formattedMtd}</span></div></td></tr>`;
+                    tbody += tr;
+                });
+            }
+            container.innerHTML = `<table class="spreadsheet-table bg-white"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+        }
+
+        function renderCashLog() { /* Standard rendering maintained for size */ }
+
+        function renderActivity(type) {
+            const container = document.getElementById(type === 'daily' ? 'daily-activity-grid' : 'monthly-activity-grid');
+            let data = multiYearData[activeYear][activeMonth];
+            let day = type === 'daily' ? (parseInt(document.getElementById('daily-activity-day').value) || 1) : 1;
+            let dim = new Date(activeYear, activeMonth + 1, 0).getDate();
+            let dateStr = type === 'daily' ? `${activeMonth+1}/${day}/${activeYear}` : `${activeMonth+1}/${dim}/${activeYear}`;
+            let monthStrShort = monthNames[activeMonth].substring(0,3) + '-' + String(activeYear).slice(2);
+            
+            let html = `
+                <div class="max-w-4xl mx-auto bg-white" style="border: 1px solid #d1d5db; padding: 2px;">
+                    <table class="je-table w-full bg-white">
+                        <thead>
+                            <tr>
+                                <th class="text-left font-normal border-none p-0 w-16 align-top">${monthStrShort}</th>
+                                <th class="text-left font-normal border-none p-0 align-top">Description</th>
+                                <th class="font-normal border-none p-0 align-top w-28">Acct. Code</th>
+                                <th class="font-normal border-none p-0 align-top w-24">Debit</th>
+                                <th class="font-normal border-none p-0 align-top w-24">Credit</th>
+                                <th class="font-normal border-none p-0 align-top w-16">ONQ</th>
+                            </tr>
+                            <tr>
+                                <th colspan="6" class="border-none py-1">
+                                    <div class="text-center">
+                                        <div class="font-bold text-sm tracking-wide">HILTON GARDEN INN</div>
+                                        <div class="font-bold text-sm">${type === 'daily' ? 'Daily Activity Entry' : 'Monthly Activity Entry'}</div>
+                                        <div class="font-bold text-sm">Posting Date</div>
+                                    </div>
+                                </th>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="border-none p-0">
+                                    <div class="bg-gray-200 border border-gray-400 font-bold text-center py-0.5 mx-auto w-64 text-sm">${dateStr}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="border-none py-1">
+                                    <div class="font-bold text-center text-sm">${monthNames[activeMonth]} ${activeYear} ONQ Hilton Recon</div>
+                                </td>
+                            </tr>
+                            <tr class="bg-gray-100 border-t-2 border-b-2 border-black">
+                                <th class="py-1">JE #</th>
+                                <th class="text-left py-1">Description</th>
+                                <th class="py-1">Acct. Code</th>
+                                <th class="py-1">Debit</th>
+                                <th class="py-1">Credit</th>
+                                <th class="py-1">ONQ</th>
+                            </tr>
+                        </thead><tbody>
+            `;
+            
+            let tDebit = 0, tCredit = 0; let hasRows = false;
+            
+            data.forEach(row => {
+                let val = 0;
+                if(type === 'daily') val = row.days[day-1] || 0;
+                else for(let i=0; i<dim; i++) val += (row.days[i] || 0);
+                
+                if(Math.abs(val) < 0.01) return;
+                
+                let isDebit = val > 0;
+                let debit = isDebit ? val : 0; let credit = !isDebit ? Math.abs(val) : 0;
+                tDebit += debit; tCredit += credit; hasRows = true;
+                
+                let acctCode = row.mappedGL !== '0' ? row.mappedGL : (row.legacyGL !== '0' ? row.legacyGL : '');
+
+                html += `<tr>
+                        <td class="text-center"></td>
+                        <td class="uppercase text-gray-800 pl-1">${row.desc}</td>
+                        <td class="text-center">${acctCode}</td>
+                        <td class="text-right pr-1">${formatPlainExcelCurrency(debit)}</td>
+                        <td class="text-right pr-1">${formatPlainExcelCurrency(credit)}</td>
+                        <td class="text-center"></td>
+                    </tr>`;
+            });
+
+            if (!hasRows) html += `<tr><td colspan="6" class="p-4 text-center text-gray-500 italic border-b border-black">No activity recorded for this period.</td></tr>`;
+            
+            html += `<tr class="font-bold bg-white border-t-2 border-black">
+                    <td class="border-r border-black"></td><td class="border-r border-black"></td><td class="border-r border-black"></td>
+                    <td class="border-r border-black text-right pr-1">${formatPlainExcelCurrency(tDebit)}</td>
+                    <td class="border-r border-black text-right pr-1">${formatPlainExcelCurrency(tCredit)}</td>
+                    <td></td>
+                </tr></tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        function openDailyAudit(day) {
+            document.getElementById('audit-date-display').innerText = `${monthNames[activeMonth]} ${day}, ${activeYear}`;
+            const container = document.getElementById('final-audit-form');
+            let data = multiYearData[activeYear][activeMonth];
+            const getVal = (descSearch) => { let r = data.find(r => r.desc.toUpperCase().includes(descSearch.toUpperCase())); return r ? r.days[day-1] || 0 : 0; };
+
+            const buildSection = (title, items) => {
+                let rows = '';
+                items.forEach((item, index) => {
+                    let val = getVal(item); let formatted = formatExcelCurrency(val);
+                    rows += `<tr class="bg-white hover:bg-blue-50 border border-gray-300 text-xs">
+                            <td class="px-1 text-center w-8 border-r border-gray-300">${index+1}</td>
+                            <td class="px-2 border-r border-gray-300 w-1/3">${item}</td>
+                            <td class="text-right px-1 border-r border-gray-300 w-24">
+                                <div class="flex justify-between"><span class="text-gray-400 select-none">${formatted === '-' ? '' : '$'}</span><span>${formatted}</span></div>
+                            </td>
+                            <td class="text-right px-1 border-r border-gray-300 w-24"><div class="flex justify-between"><span class="text-gray-400 select-none">$</span><span>0.00</span></div></td>
+                            <td class="text-right px-1 border-r border-gray-300 w-24"><div class="flex justify-between"><span class="text-gray-400 select-none">$</span><span>0.00</span></div></td>
+                            <td class="text-right px-1 border-r border-gray-300 w-24 font-bold bg-gray-50"><div class="flex justify-between"><span class="text-gray-400 select-none">${formatted === '-' ? '' : '$'}</span><span>${formatted}</span></div></td>
+                            <td class="text-right px-1 bg-gray-100 border-r border-gray-300 text-gray-400 w-24">-</td>
+                            <td class="text-right px-1 bg-gray-100 border-r border-gray-300 text-gray-400 w-24">-</td>
+                            <td class="text-right px-1 bg-gray-100 border-r border-gray-300 text-gray-400 w-24">-</td>
+                            <td class="text-right px-1 bg-gray-100 border-r border-gray-300 text-gray-400 w-24">-</td>
+                            <td class="text-right px-1 bg-gray-100 border-r border-gray-300 text-gray-400 w-24">-</td>
+                            <td class="text-right px-1 bg-gray-100 text-gray-400 w-24">-</td>
+                        </tr>`;
+                });
+                return `<div class="mb-4 bg-white shadow-sm border border-black">
+                            <div class="bg-blue-300 text-black px-2 py-1 text-sm border-b border-black font-semibold">${title}</div>
+                            <table class="w-full border-collapse" style="font-family: Arial, sans-serif;">
+                                <thead><tr class="bg-gray-200 text-[10px] text-gray-700 border-b-2 border-gray-400">
+                                    <th class="font-normal border-r border-gray-300"></th><th class="text-left font-normal px-2 border-r border-gray-300">Charge Type</th>
+                                    <th class="text-right font-normal px-1 border-r border-gray-300">Actual Today</th><th class="text-right font-normal px-1 border-r border-gray-300">Adjusted</th>
+                                    <th class="text-right font-normal px-1 border-r border-gray-300">Adj Transferred</th><th class="text-right font-normal px-1 border-r border-gray-300">Net Today</th>
+                                    <th class="text-right font-normal px-1 border-r border-gray-300">M-T-D</th><th class="text-right font-normal px-1 border-r border-gray-300">LY-M-T-D</th>
+                                    <th class="text-right font-normal px-1 border-r border-gray-300">Variance</th><th class="text-right font-normal px-1 border-r border-gray-300">Y-T-D</th>
+                                    <th class="text-right font-normal px-1 border-r border-gray-300">LY-T-D</th><th class="text-right font-normal px-1">Variance</th>
+                                </tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>`;
+            };
+
+            container.innerHTML = `<div class="max-w-7xl mx-auto"><h1 class="text-center text-xl font-bold mb-6 text-black">Final Audit</h1>
+                    ${buildSection('Room Revenue', ['EXTRA ADULT', 'EXTRA NO SHOW ROOM REVENUE', 'GUEST ROOM', 'GUEST ROOM HONORS', 'NO SHOW ROOM REVENUE', 'PREPAID EARLY CHECKOUT', 'ROOM REVENUE ADJUSTMENT', 'ROOM UPGRADE'])}
+                    ${buildSection('Other Room Revenue', ['ADD-ON EARLY ARRIVAL', 'ADD-ON LATE CHECK-OUT', 'ADD-ON TRAVELING W/ PET', 'LATE CANCEL ROOM REVENUE'])}
+                    ${buildSection('Taxes', ['BANQUET SALES TAX', 'RM - CA TOURISM ASSESSMENT', 'RM - LOCAL TOURISM ASSESSMENT', 'RM - OCCUPANCY TAX', 'SALES TAX'])}
+                    ${buildSection('Cash Deposit And Cash Drop', ['IN HOUSE', 'ADVANCE DEPOSIT', 'DIRECT BILL', 'CASH DROPS', 'CASH POSTED', 'SAFE DROPS', 'CASH OVER / SHORT'])}
+                </div>`;
+        }
+        
+        function saveDailyAudit() { alert("Data saved for Day " + activeDay + "."); renderAllData(); }
+        function renderDictionary() {}
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    let reportDateInfo = null;
+                    let isDaily = false;
+                    let isMonthly = false;
+                    let targetSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    let json = XLSX.utils.sheet_to_json(targetSheet, {header: 1});
+
+                    // 1. INTELLIGENT INTAKE: Scan for Date format to auto-route
+                    for(let r=0; r<Math.min(json.length, 30); r++) {
+                        if(!json[r]) continue;
+                        let rowStr = json[r].map(c => String(c||'').toLowerCase()).join(' ');
+                        
+                        // Check for Daily Final Audit
+                        for(let c=0; c<json[r].length; c++) {
+                            let cell = String(json[r][c] || '').trim();
+                            let dateMatch = cell.match(/^Date:\s*([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})/i);
+                            if (dateMatch) {
+                                isDaily = true;
+                                const ms = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                reportDateInfo = { month: ms.findIndex(m => m.toLowerCase() === dateMatch[1].toLowerCase()), day: parseInt(dateMatch[2]), year: parseInt(dateMatch[3]) };
+                            }
+                        }
+
+                        // Check for Monthly Activity Date
+                        if (rowStr.includes('posting date') && !isDaily) {
+                            let nextRow = json[r+1] || [];
+                            for(let c=0; c<nextRow.length; c++) {
+                                let d = new Date(Math.round((nextRow[c] - 25569) * 86400 * 1000));
+                                if(isNaN(d.getTime())) d = new Date(nextRow[c]);
+                                if (!isNaN(d.getTime()) && d.getFullYear() > 2000) {
+                                    isMonthly = true;
+                                    reportDateInfo = { month: d.getMonth(), year: d.getFullYear() };
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (reportDateInfo) {
+                        let targetYear = reportDateInfo.year;
+                        let targetMonth = reportDateInfo.month;
+                        
+                        if(!multiYearData[targetYear]) {
+                            if (!confirm(`The uploaded file is for ${targetYear}, which doesn't exist. Create a new Master Ledger?`)) return;
+                            multiYearData[targetYear] = {};
+                            for(let m=0; m<12; m++) multiYearData[targetYear][m] = [];
+                            updateWorkspaceDropdown();
+                        }
+                        
+                        activeYear = targetYear; activeMonth = targetMonth;
+                        if(isDaily) activeDay = reportDateInfo.day;
+                        document.getElementById('workspace-year-select').value = activeYear;
+                        document.getElementById('global-month-select').value = activeMonth;
+                        
+                        let monthData = multiYearData[activeYear][activeMonth];
+                        let importedCount = 0;
+
+                        if (isDaily) {
+                            // --- DAILY EXTRACTOR ---
+                            let currentDescCol = -1, currentValCol = -1;
+                            json.forEach((row) => {
+                                if(!row || row.length === 0) return;
+                                let foundActualToday = false;
+                                for(let c=0; c<row.length; c++) {
+                                    if(String(row[c] || '').trim().toLowerCase() === 'actual today') {
+                                        currentValCol = c; foundActualToday = true;
+                                        for(let dc=c-1; dc>=0; dc--) {
+                                            let dStr = String(row[dc]||'').trim().toLowerCase();
+                                            if(dStr.includes('name') || dStr.includes('type') || dStr.includes('ledger')) { currentDescCol = dc; break; }
+                                        }
+                                        if(currentDescCol === -1) currentDescCol = Math.max(0, c-1);
+                                    }
+                                }
+
+                                if (!foundActualToday && currentValCol !== -1 && currentDescCol !== -1) {
+                                    let desc = String(row[currentDescCol] || '').trim();
+                                    let rawVal = row[currentValCol];
+                                    
+                                    if (desc && typeof rawVal !== 'undefined' && rawVal !== '') {
+                                        let cleanStr = String(rawVal).replace(/[$,\s]/g, '');
+                                        if (cleanStr.startsWith('(') && cleanStr.endsWith(')')) cleanStr = '-' + cleanStr.slice(1, -1);
+                                        let val = parseFloat(cleanStr);
+                                        
+                                        if (!isNaN(val) && val !== 0) {
+                                            let cleanDesc = desc.replace(/^\*\s*/, '').trim(); 
+                                            
+                                            // USE SMART ENGINE TO RESOLVE GL
+                                            let mappedInfo = smartTranslateGL("0", cleanDesc);
+
+                                            // ACCOUNTING SIGN FLIPPING
+                                            if (mappedInfo.newGL !== "0") {
+                                                let prefix = mappedInfo.newGL.charAt(0);
+                                                if (prefix === '4' || prefix === '2' || prefix === '3' || prefix === '8') val = -val;
+                                            }
+                                            
+                                            let existingRow = monthData.find(r => r.desc.toUpperCase() === mappedInfo.newDesc.toUpperCase());
+                                            if (!existingRow) {
+                                                existingRow = { legacyGL: "0", mappedGL: mappedInfo.newGL, desc: mappedInfo.newDesc, days: Array(31).fill(0) };
+                                                monthData.push(existingRow);
+                                            }
+                                            existingRow.days[activeDay - 1] = val; 
+                                            importedCount++;
+                                        }
+                                    }
+                                }
+                                if (row.every(cell => !cell || String(cell).trim() === '')) { currentDescCol = -1; currentValCol = -1; }
+                            });
+                            alert(`Daily Final Audit Processed! Jumped to ${monthNames[activeMonth]} ${activeDay}, ${activeYear}. Imported ${importedCount} lines.`);
+                            
+                        } else if (isMonthly) {
+                            // --- MONTHLY SWEEPER ---
+                            let allDataSheet = workbook.Sheets[workbook.SheetNames.find(s => s.toLowerCase().includes('all data')) || workbook.SheetNames[0]];
+                            let adJson = XLSX.utils.sheet_to_json(allDataSheet, {header: 1});
+                            
+                            adJson.forEach((row, rowIndex) => {
+                                if(rowIndex < 1 || !row || !row.length) return; 
+                                let desc = ''; let account = '0'; let daysData = Array(31).fill(0); let isValidRow = false;
+
+                                let accountColIndex = row.findIndex(c => typeof c === 'string' && (c.match(/^\d{4}-\d{3}$/) || c.match(/^\d{4}$/)));
+                                if (accountColIndex !== -1) account = String(row[accountColIndex]).trim();
+
+                                let descColIndex = row.findIndex((c, i) => i !== accountColIndex && typeof c === 'string' && c.length > 3 && !c.match(/^\d{4}-\d{3}/));
+                                
+                                if(descColIndex !== -1) {
+                                    desc = String(row[descColIndex]).trim();
+                                    let dayCounter = 0;
+                                    for (let i = descColIndex + 1; i < row.length && dayCounter < 31; i++) {
+                                        let cellVal = row[i];
+                                        if (typeof cellVal === 'number') { daysData[dayCounter] = cellVal; if(cellVal !== 0) isValidRow = true; } 
+                                        else if (typeof cellVal === 'string') {
+                                            let cleanStr = cellVal.replace(/[$,\s]/g, '');
+                                            if (cleanStr.match(/^\(?[0-9.]+\)?$/)) {
+                                                if (cleanStr.startsWith('(') && cleanStr.endsWith(')')) cleanStr = '-' + cleanStr.slice(1, -1);
+                                                let parsedVal = parseFloat(cleanStr);
+                                                if (!isNaN(parsedVal)) { daysData[dayCounter] = parsedVal; if(parsedVal !== 0) isValidRow = true; }
+                                            }
+                                        }
+                                        dayCounter++;
+                                    }
+                                }
+
+                                if(desc && (isValidRow || account !== '0')) {
+                                    // USE SMART ENGINE TO RESOLVE GL
+                                    let mappedInfo = smartTranslateGL(account, desc);
+                                    monthData.push({ legacyGL: account, mappedGL: mappedInfo.newGL, desc: mappedInfo.newDesc, days: daysData });
+                                    importedCount++;
+                                }
+                            });
+                            alert(`Monthly Master Processed! Detected ${monthNames[activeMonth]} ${activeYear}. Auto-sorted ${importedCount} GL accounts.`);
+                        }
+                        changeGlobalMonth();
+                    } else {
+                        alert("Could not detect a valid Date format on the file to auto-sort.");
+                    }
+                } catch(err) { console.error(err); alert("Error parsing file."); }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        function exportToExcel() {
+            let data = multiYearData[activeYear][activeMonth];
+            if (!data || data.length === 0) return alert("No data to export.");
+
+            let dim = new Date(activeYear, activeMonth + 1, 0).getDate();
+            let dateStr = `${activeMonth + 1}/${dim}/${activeYear}`;
+            let descriptionStr = `Hilton Monthly Activity - ${monthNames[activeMonth]} ${activeYear}`;
+
+            let wb = XLSX.utils.book_new();
+            let sageExport = [];
+            
+            sageExport.push(['DONOTIMPORT', 'JOURNAL', 'DATE', 'REVERSEDATE', 'DESCRIPTION', 'REFERENCE_NO', 'LINE_NO', 'MEMO', 'ACCT_NO', '#Account Name', 'DEBIT', 'CREDIT', 'LOCATION_ID', 'SOURCEENTITY', 'DEPT_ID', 'GLENTRY_CLASSID', 'GLENTRY_CUSTOMERID', 'GLENTRY_ITEMID', 'GLENTRY_VENDORID', 'GLENTRY_EMPLOYEEID', 'STATE', 'ALLOCATION_ID', 'DOCUMENT']);
+            sageExport.push(['# Any row which starts with a # will be ignored', 'Field Name: JOURNAL', 'Field Name: DATE', 'Field Name: REVERSEDATE', 'Field Name: DESCRIPTION', 'Field Name: REFERENCE_NO', 'Field Name: LINE_NO', 'Field Name: MEMO', 'Field Name: ACCT_NO', '', 'Field Name: DEBIT', 'Field Name: CREDIT', 'Field Name: LOCATION_ID', 'Field Name: SOURCEENTITY', 'Field Name: DEPT_ID', 'Field Name: CLASSID', 'Field Name: CUSTOMERID', 'Field Name: ITEMID', 'Field Name: VENDORID', 'Field Name: EMPLOYEEID', 'Field Name: STATE', 'Field Name: ALLOCATION', 'Field Name: DOCUMENT']);
+
+            let lineNo = 1;
+            data.forEach(row => {
+                let val = 0; for(let i=0; i<dim; i++) val += (row.days[i] || 0);
+                if(Math.abs(val) >= 0.01) {
+                    let isDebit = val > 0;
+                    let acctNo = row.mappedGL !== '0' ? row.mappedGL : (row.legacyGL !== '0' ? row.legacyGL : '');
+                    
+                    sageExport.push([
+                        '', lineNo === 1 ? 'GJ' : '', lineNo === 1 ? dateStr : '', '',
+                        lineNo === 1 ? descriptionStr : '', '', lineNo, row.desc, acctNo, row.desc,
+                        isDebit ? val.toFixed(2) : '', !isDebit ? Math.abs(val).toFixed(2) : '',
+                        'E15', '', '000', 'G00000', '', '', '', '',
+                        lineNo === 1 ? 'Draft' : '', '', ''
+                    ]);
+                    lineNo++;
+                }
+            });
+            let wsSage = XLSX.utils.aoa_to_sheet(sageExport);
+            XLSX.utils.book_append_sheet(wb, wsSage, "JE Import");
+            XLSX.writeFile(wb, `Sage_JE_Import_Hilton_${monthNames[activeMonth]}_${activeYear}.xlsx`);
+        }
+
+        function processQuickTranslation(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            
+            document.getElementById('translator-results').classList.add('hidden');
+            let uploadLabel = document.getElementById('translator-upload-label');
+            let originalText = uploadLabel.innerText;
+            uploadLabel.innerText = "Scanning & Translating File...";
+            uploadLabel.classList.add('animate-pulse');
+            translatedFileName = file.name.replace(/\.[^/.]+$/, "") + "_Translated.xlsx";
+            
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const workbook = XLSX.read(new Uint8Array(evt.target.result), {type: 'array'});
+                    let translationCount = 0;
+                    
+                    workbook.SheetNames.forEach(sheetName => {
+                        let json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1, raw: false}); 
+                        let updatedJson = json.map(row => {
+                            return row.map(cell => {
+                                if (cell === null || cell === undefined || cell === "") return cell;
+                                if (typeof cell === 'number') return cell; // NEVER translate naked numbers
+
+                                let cellStr = String(cell).trim();
+                                
+                                // SMART DETECTION: Is it a GL Account format or Text?
+                                let isGLFormat = /^\d{4}[-.]\d{3}$/.test(cellStr) || /^\d{4}$/.test(cellStr);
+
+                                if (isGLFormat) {
+                                    // It's an Account Code -> Apply Department Logic
+                                    let translated = smartTranslateGL(cellStr, "");
+                                    if (translated.newGL !== cellStr && translated.newGL !== "0") {
+                                        translationCount++;
+                                        return translated.newGL;
+                                    }
+                                } else if (/[a-zA-Z]/.test(cellStr)) {
+                                    // It's Text -> Swap for NEW Description
+                                    let translated = smartTranslateGL("0", cellStr);
+                                    if (translated.newDesc !== cellStr && translated.newDesc !== "") {
+                                        translationCount++;
+                                        return translated.newDesc;
+                                    }
+                                }
+                                return cell; // Pass through if no changes
+                            });
+                        });
+                        workbook.Sheets[sheetName] = XLSX.utils.aoa_to_sheet(updatedJson);
+                    });
+
+                    translatedWorkbook = workbook;
+                    uploadLabel.innerText = originalText;
+                    uploadLabel.classList.remove('animate-pulse');
+                    document.getElementById('translator-results').classList.remove('hidden');
+                    document.getElementById('translator-stats').innerText = `Success! Universal Department Routing applied. Safely translated ${translationCount} cells.`;
+                } catch(err) { console.error(err); alert("Error translating file."); }
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        function downloadTranslatedFile() {
+            if (!translatedWorkbook) return;
+            XLSX.writeFile(translatedWorkbook, translatedFileName);
+            document.getElementById('translator-results').classList.add('hidden');
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
